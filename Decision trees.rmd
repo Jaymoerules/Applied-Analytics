@@ -1,0 +1,144 @@
+---
+title: "Decision trees"
+author: "James Karebe"
+date: "2022-10-27"
+output: html_document
+---
+
+```{r}
+setwd("D:School/3/Applied Analytics")
+credit <- read.csv("D:/School/3/Applied Analytics/Credit_Data.csv",stringsAsFactors = TRUE)
+```
+
+
+## Exploring data
+
+```{r}
+str(credit)
+```
+
+Exploring variables of concern and their distributions.
+
+```{r}
+table(credit$credit_history)
+table(credit$savings)
+table(credit$job)
+table(credit$duration_in_month)
+```
+
+```{r}
+summary(credit$duration_in_month)
+summary(credit$savings)
+```
+
+Duration in months is skewed to the right.
+
+Changing the dependent variable labels;
+
+```{r}
+credit$default <- factor(credit$default, levels = c("0","1"), labels = c("No","Yes"))
+table(credit$default)
+```
+
+To randomize the order of the data
+
+```{r}
+set.seed(12345)
+credit_r <- credit[order(runif(1000)), ]
+```
+
+Change the data from reading as levels to read as names
+
+```{r}
+levels(credit_r$savings)<-make.names(levels(credit_r$savings))
+levels(credit_r$account_check_status)<-make.names(levels(credit_r$account_check_status))
+levels(credit_r$present_emp_since)<-make.names(levels(credit_r$present_emp_since))
+levels(credit_r$personal_status_sex)<-make.names(levels(credit_r$personal_status_sex))
+levels(credit_r$property)<-make.names(levels(credit_r$property))
+levels(credit_r$credit_history)<-make.names(levels(credit_r$credit_history))
+levels(credit_r$foreign_worker)<-make.names(levels(credit_r$foreign_worker))
+levels(credit_r$housing)<-make.names(levels(credit_r$housing))
+levels(credit_r$job)<-make.names(levels(credit_r$job))
+levels(credit_r$other_debtors)<-make.names(levels(credit_r$other_debtors))
+levels(credit_r$other_installment_plans)<-make.names(levels(credit_r$other_installment_plans))
+levels(credit_r$purpose)<-make.names(levels(credit_r$purpose))
+levels(credit_r$telephone)<-make.names(levels(credit_r$telephone))
+```
+
+Explore the randomized dataset;
+
+```{r}
+summary(credit_r$duration_in_month)
+summary(credit$duration_in_month)
+```
+
+Comparing the first few values;
+
+```{r}
+head(credit$credit_amount)
+head(credit_r$credit_amount)
+```
+
+
+## Training the data
+
+Split the data for training and testing *90/10*
+
+```{r}
+credit_train <- credit_r[1:900, ]
+credit_test <- credit_r[901:1000, ]
+
+prop.table(table(credit_test$default))
+prop.table(table(credit_train$default))
+```
+
+It is a fairly equal split
+
+Implementing a c5.0 algorithm
+
+```{r}
+library(C50)
+credit_model <- C5.0(credit_train[-1],credit_train$default)
+credit_model
+summary(credit_model)
+```
+
+The model incorrectly predicts 127 cases (14.1%)
+
+TP = 590, FP = 85, TN = 183, FN = 42
+
+
+## Evaluating model performance
+
+Predicting the model to our test data set
+
+```{r}
+credit_pred <- predict(credit_model, credit_test)
+library(gmodels)
+CrossTable(credit_test$default,credit_pred, 
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+```
+
+The model correctly predicts 75% and incorrect 25%. However false negatives need to be as minimal as possible (higher false negatives are costly).
+
+
+## Improving model performance
+
+Using adaptive boosting
+
+```{r}
+credit_boost10 <- C5.0(credit_train[-1], credit_train$default, trials = 10)
+credit_boost10
+summary(credit_boost10)
+```
+There are 30 incorrect predictions (3.33% error)
+
+```{r}
+credit_boost_pred10 <- predict(credit_boost10, credit_test)
+CrossTable(credit_test$default,credit_boost_pred10, 
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+           dnn = c('actual default', 'predicted default'))
+```
+The model correctly predicts 79%. It also has reduced false positive to 16
+
